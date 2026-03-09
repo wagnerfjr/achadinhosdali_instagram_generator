@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = Image.LANCZOS
 try:
-    from moviepy import VideoFileClip, VideoClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, concatenate_videoclips
+    from moviepy import VideoFileClip, VideoClip, AudioFileClip, CompositeAudioClip, CompositeVideoClip, concatenate_videoclips, ImageClip
     import moviepy.video.fx.all as vfx
 except ImportError:
     # Extreme fallback for some modular 2.x versions
@@ -131,7 +131,112 @@ class VideoEngineV4:
             # Fit and pad
             return clip.fx(vfx.resize, width=W).set_position(("center", "center"))
 
-    def assemble_hybrid_video(self, product, intro_video_path, audio_path, ass_path, music_path, output_name, outro_video_path=None):
+    def _create_price_sticker(self, price, discount, duration, width=1080, height=1920):
+        """Creates a professional price sticker overlay using Pillow."""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            import numpy as np
+
+            # Sticker dimensions (centered bottom area)
+            sticker_w, sticker_h = 600, 220
+            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            
+            # Position: Lower middle
+            x_center = width // 2
+            y_base = height - 550
+            
+            # 1. Background Badge (Rounded Rect)
+            # Use Li's Orange color #f97316
+            orange = (249, 115, 22, 255)
+            dark_bg = (30, 30, 30, 240) # Semi-transparent dark
+            
+            rect_shape = [x_center - 280, y_base, x_center + 280, y_base + 180]
+            draw.rounded_rectangle(rect_shape, radius=25, fill=dark_bg, outline=orange, width=5)
+
+            # --- FONT LOADING ---
+            # Try multiple paths for robustness
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            font_candidates = [
+                os.path.join(base_dir, "assets", "Roboto-Bold.ttf"),
+                "C:/Windows/Fonts/arialbd.ttf",
+                "C:/Windows/Fonts/arial.ttf",
+                "arial.ttf",
+                "DejaVuSans-Bold.ttf"
+            ]
+            
+            font_path = None
+            for f in font_candidates:
+                if os.path.exists(f):
+                    font_path = f
+                    break
+            
+            if not font_path:
+                logger.warning("No TTF fonts found, using default (limited quality)")
+                font_price = ImageFont.load_default()
+                font_label = ImageFont.load_default()
+                font_discount = ImageFont.load_default()
+            else:
+                try:
+                    font_price = ImageFont.truetype(font_path, 90)
+                    font_label = ImageFont.truetype(font_path, 40)
+                    font_discount = ImageFont.truetype(font_path, 50)
+                except Exception as fe:
+                    logger.error(f"Failed to load font {font_path}: {fe}")
+                    font_price = ImageFont.load_default()
+                    font_label = ImageFont.load_default()
+                    font_discount = ImageFont.load_default()
+
+            # 3. Draw "POR APENAS" label
+            draw.text((x_center, y_base + 40), "POR APENAS", font=font_label, fill=(255, 255, 255, 200), anchor="mm")
+
+            # 4. Draw price: R$ 34,90
+            price_str = f"R$ {price:.2f}".replace('.', ',')
+            draw.text((x_center, y_base + 110), price_str, font=font_price, fill=(255, 255, 0, 255), anchor="mm")
+
+            # 5. Draw Discount Badge (Top right of sticker)
+            if discount and float(discount) > 0:
+                disc_text = f"-{int(float(discount))}%"
+                # Small red circle/pill for discount
+                d_rect = [x_center + 180, y_base - 30, x_center + 310, y_base + 30]
+                draw.rounded_rectangle(d_rect, radius=15, fill=(220, 38, 38, 255)) # Red
+                draw.text((x_center + 245, y_base), disc_text, font=font_discount, fill=(255, 255, 255, 255), anchor="mm")
+
+            # Split RGBA to RGB and Mask for MoviePy handling
+            img_np = np.array(img)
+            img_rgb = img_np[:, :, :3]
+            img_alpha = img_np[:, :, 3] / 255.0
+
+            def make_frame(t):
+                # Subtle entrance pulse
+                scale = 1.0 + 0.05 * np.sin(t * 2 * np.pi / 2) if t < 1 else 1.0
+                if scale == 1.0: return img_rgb
+                
+                # Rescaling logic if needed
+                temp_img = img.resize((int(width * scale), int(height * scale)), Image.LANCZOS)
+                # Recenter
+                new_img = Image.new('RGB', (width, height), (0,0,0))
+                new_img.paste(temp_img, ((width - temp_img.width)//2, (height - temp_img.height)//2))
+                return np.array(new_img)
+
+            def make_mask(t):
+                scale = 1.0 + 0.05 * np.sin(t * 2 * np.pi / 2) if t < 1 else 1.0
+                if scale == 1.0: return img_alpha
+                
+                temp_alpha = img.getchannel("A").resize((int(width * scale), int(height * scale)), Image.LANCZOS)
+                new_alpha = Image.new('L', (width, height), 0)
+                new_alpha.paste(temp_alpha, ((width - temp_alpha.width)//2, (height - temp_alpha.height)//2))
+                return np.array(new_alpha) / 255.0
+
+            sticker_clip = VideoClip(make_frame, duration=duration)
+            sticker_mask = VideoClip(make_mask, duration=duration, ismask=True)
+            return sticker_clip.set_mask(sticker_mask)
+        except Exception as e:
+            logger.error(f"Price sticker generation failed: {e}")
+            return None
+
+
+    def assemble_hybrid_video(self, product, intro_video_path, audio_path, ass_path, music_path, output_name, outro_video_path=None, include_price=True):
         """
         Assembles a professional Sandwich Video:
         1. Intro (Original Li Audio)
@@ -212,7 +317,13 @@ class VideoEngineV4:
             bg_vid.fps = 24
             
             s_clip_resized = s_clip.fx(vfx.resize, width=W).set_position(("center", "center"))
-            body_clip = CompositeVideoClip([bg_vid, s_clip_resized]).set_duration(body_duration)
+            body_clip = CompositeVideoClip([bg_vid, s_clip_resized])
+            
+            # --- PRICE STICKER REMOVED (Migrated to Audio) ---
+            body_clip = CompositeVideoClip([bg_vid, s_clip_resized])
+            # -------------------------------------------------
+            
+            body_clip = body_clip.set_duration(body_duration)
             body_clip.fps = 24
             s_clip.close()
         
@@ -254,6 +365,12 @@ class VideoEngineV4:
                     from moviepy.editor import concatenate_videoclips
                     
                 body_clip = concatenate_videoclips(img_clips, method="compose")
+                
+                # --- PRICE STICKER REMOVED (Migrated to Audio) ---
+                body_clip = CompositeVideoClip(img_clips)
+                # -------------------------------------------------
+                
+                body_clip = body_clip.set_duration(body_duration)
                 body_clip.fps = 24
             else:
                 # Fallback: Black screen
@@ -332,7 +449,7 @@ class VideoEngineV4:
             "-filter_complex", filter_complex,
             "-map", "[outv]",
             "-map", f"{a_idx}:a",
-            "-c:v", "libx264", "-crf", "22", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", "-y", output_path
+            "-c:v", "libx264", "-crf", "22", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-y", output_path
         ]
         
         try:
@@ -348,7 +465,7 @@ class VideoEngineV4:
         update_progress(product['id'], "completed", 100, "Vídeo Pro gerado com sucesso via FFmpeg!")
         return output_path
 
-    def assemble_final_video(self, product, did_video_path, audio_path, ass_path, music_path, output_name):
+    def assemble_final_video(self, product, did_video_path, audio_path, ass_path, music_path, output_name, include_price=True):
         """
         Assembles the final video with all components.
         - did_video_path: The lip-sync video from D-ID.
@@ -377,27 +494,33 @@ class VideoEngineV4:
             # Create Product Overlay Clip
             # Position: Bottom Right or Side
             def make_overlay_frame(t):
-                # Dynamic entrance for product
                 scale = max(0.01, t) if t < 1 else 1.0
-
-                pw = int(W * 0.5 * scale)
-                # Ensure at least 1px
-                pw = max(1, pw)
-                
+                pw = max(1, int(W * 0.5 * scale))
                 aspect = prod_img.height / prod_img.width
-                ph = int(pw * aspect)
-                ph = max(1, ph)
-
+                ph = max(1, int(pw * aspect))
                 resized = prod_img.resize((pw, ph), Image.LANCZOS)
-
-                # Create transparent layer
-                overlay = Image.new('RGBA', (W, H), (0,0,0,0))
-                overlay.paste(resized, (W - pw - 50, H - ph - 300), resized)
+                overlay = Image.new('RGB', (W, H), (0,0,0))
+                overlay.paste(resized, (W - pw - 50, H - ph - 300))
                 return np.array(overlay)
 
+            def make_overlay_mask(t):
+                scale = max(0.01, t) if t < 1 else 1.0
+                pw = max(1, int(W * 0.5 * scale))
+                aspect = prod_img.height / prod_img.width
+                ph = max(1, int(pw * aspect))
+                resized_mask = prod_img.getchannel("A").resize((pw, ph), Image.LANCZOS)
+                overlay_mask = Image.new('L', (W, H), 0)
+                overlay_mask.paste(resized_mask, (W - pw - 50, H - ph - 300))
+                return np.array(overlay_mask) / 255.0
+
             overlay_clip = VideoClip(make_overlay_frame, duration=clip.duration)
+            overlay_mask = VideoClip(make_overlay_mask, duration=clip.duration, ismask=True)
+            overlay_clip = overlay_clip.set_mask(overlay_mask)
+            
+            # --- PRICE STICKER REMOVED (Migrated to Audio) ---
             final_clip = CompositeVideoClip([clip, overlay_clip])
-        
+            # -------------------------------------------------
+            
         # 5. Add Music
         if music_path and os.path.exists(music_path):
             bg_music = AudioFileClip(music_path).volumex(0.3).set_duration(clip.duration)

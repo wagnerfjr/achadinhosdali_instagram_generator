@@ -4,6 +4,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from backend.logger import setup_logger
 
+from backend.utils.text_processor import clean_product_name
 from dotenv import load_dotenv
 load_dotenv(override=True)
 logger = setup_logger("script_generator")
@@ -32,11 +33,14 @@ def generate_viral_script(product_data, include_price: bool = True):
     intro_phrase = selected_intro.get("phrase", INTRO_PHRASE)
     
     # Textual data for AI
-    product_name = product_data.get('name', 'produto incrível')
+    original_name = product_data.get('name', 'produto incrível')
+    # Pre-clean the name to remove technical specs like "1182ml"
+    clean_name = clean_product_name(original_name)
+    
     price_current = product_data.get('current_price', product_data.get('price', ''))
     discount = product_data.get('current_discount', product_data.get('discount_rate', ''))
     
-    price_context = f"Preço: {price_current}, Desconto: {discount}%" if include_price else "NÃO mencione preço ou desconto."
+    price_context = f"Preço: R$ {price_current}, Desconto: {discount}%" if include_price else "NÃO mencione preço ou desconto."
     
     system_prompt = f"""
     Você é a Li, influenciadora de Achadinhos.
@@ -44,19 +48,18 @@ def generate_viral_script(product_data, include_price: bool = True):
     
     Sua tarefa: Escrever APENAS o corpo (narração do produto) para ElevenLabs.
     
-    REGRAS DE IMPACTO E ECONOMIA:
-    1. MÁXIMO de 180 caracteres. Mantenha entre 150 e 180 chars.
-    2. Estrutura: Nome do Produto -> Por que é viral/bom -> Chamada de curiosidade.
-    3. NO VÍDEO: {price_context}
-    4. NÃO inclua "comenta achadinho", "link na bio" ou saudações de entrada/saída.
-    5. O ritmo deve ser rápido e direto.
-    6. Texto em minúsculas, sem pontuação excessiva.
+    REGRAS CRÍTICAS DE NARRATIVA:
+    1. USE O NOME LIMPO: "{clean_name}". Identifique o NOME DA MARCA e mantenha a grafia EXATA (ex: WATERSY).
+    2. NUNCA fale especificações técnicas (ex: 1182ml, 220v). Foque no benefício.
+    3. MANTENHA o texto entre 170 e 210 caracteres.
+    4. PREÇO E DESCONTO: Se include_price=True, você DEVE dizer: "por apenas [preço] e tá com [desconto]% de desconto".
+    5. Estilo: Rápido, direto, minúsculas, sem pontuação excessiva. Sem saudações.
     """
     
-    user_prompt = f"Produto: {product_name}. {price_context}"
+    user_prompt = f"Produto Original: {original_name}. {price_context}"
 
     try:
-        logger.info(f"Generating ULTRA ECONOMY script body for {product_name} (Price included: {include_price})...")
+        logger.info(f"Generating ULTRA ECONOMY script body for {original_name} (Price included: {include_price})...")
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -82,4 +85,4 @@ def generate_viral_script(product_data, include_price: bool = True):
         return intro_phrase, clean_body
     except Exception as e:
         logger.error(f"Error generating script: {e}")
-        return intro_phrase, f"olha esse achadinho: {product_name} por {price_current}!"
+        return intro_phrase, f"olha esse achadinho: {clean_name} por {price_current}!"

@@ -77,7 +77,8 @@ class VideoTemplateFactory:
             ass_path=ass_path,
             music_path=None,
             output_name=output_name,
-            outro_video_path=cta_path
+            outro_video_path=cta_path,
+            include_price=False
         )
         
         return final_path
@@ -119,7 +120,8 @@ class VideoTemplateFactory:
             ass_path=ass_path,
             music_path=None,
             output_name=output_name,
-            outro_video_path=cta_path
+            outro_video_path=cta_path,
+            include_price=True
         )
         
         return final_path

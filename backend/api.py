@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .product_loader import load_products, get_product
+from .product_loader import load_products, get_product, load_queued_products, load_ready_products, load_ignored_products, search_products
 from .caption_generator import generate_caption, generate_seo_caption
 from .shopee_service import ShopeeAffiliateClient
 from .logger import setup_logger
@@ -56,6 +56,38 @@ def api_products(limit: int = 50):
     """Fetch raw products from VPS database."""
     products = load_products(limit)
     return {"status": "success", "data": products}
+
+@app.get("/products/queued")
+def api_products_queued(limit: int = 50):
+    """Products Na Fila (ContentItem status=Scheduled)."""
+    products = load_queued_products(limit)
+    return {"status": "success", "count": len(products), "data": products}
+
+@app.get("/products/ready")
+def api_products_ready(limit: int = 50):
+    """Products Prontos (ContentItem status=Draft or In_Review)."""
+    products = load_ready_products(limit)
+    return {"status": "success", "count": len(products), "data": products}
+
+@app.get("/products/sent")
+def api_products_sent(limit: int = 50):
+    """Products Enviados (ContentItem status=Posted)."""
+    products = load_products(limit)
+    return {"status": "success", "count": len(products), "data": products}
+
+@app.get("/products/ignored")
+def api_products_ignored(limit: int = 50):
+    """Products Lixeira (ignored_products, is_hidden=False)."""
+    products = load_ignored_products(limit)
+    return {"status": "success", "count": len(products), "data": products}
+
+@app.get("/products/search")
+def api_products_search(q: str, limit: int = 50):
+    """Search products by name."""
+    if not q:
+        return {"status": "success", "count": 0, "data": []}
+    products = search_products(q, limit)
+    return {"status": "success", "count": len(products), "data": products}
 
 @app.post("/generate/{product_id}")
 def api_generate(product_id: str):

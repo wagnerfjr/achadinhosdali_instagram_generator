@@ -8,8 +8,131 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Achadinhos da Li - Premium</title>
-    <link rel="stylesheet" href="/frontend/style.css?v=1.1">
+    <link rel="stylesheet" href="/frontend/style.css?v=1.2">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* ── Tab System ── */
+        .tabs-section {
+            margin-top: 50px;
+        }
+
+        .tabs-nav {
+            display: flex;
+            gap: 6px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 24px;
+            overflow-x: auto;
+            padding-bottom: 2px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 10px 18px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            white-space: nowrap;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .tab-btn.active {
+            color: #fff;
+            border-bottom-color: #f97316;
+        }
+
+        .tab-badge {
+            display: inline-block;
+            background: rgba(249, 115, 22, 0.2);
+            color: #f97316;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            padding: 1px 6px;
+            margin-left: 5px;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .tab-badge.zero {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        .tab-loader {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.45);
+            padding: 40px 0;
+            font-size: 0.9rem;
+        }
+
+        .read-only-badge {
+            font-size: 0.7rem;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.4);
+            border-radius: 4px;
+            padding: 2px 7px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        /* ── Search Bar ── */
+        .search-container {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 5px;
+        }
+
+        #search-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 6px 12px;
+            color: #fff;
+            font-size: 0.85rem;
+            width: 200px;
+            transition: all 0.3s;
+        }
+
+        #search-input:focus {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #f97316;
+            outline: none;
+            width: 250px;
+        }
+
+        .search-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 5px 10px;
+            transition: all 0.2s;
+        }
+
+        .search-btn:hover {
+            background: rgba(249, 115, 22, 0.2);
+            border-color: #f97316;
+        }
+    </style>
 </head>
 
 <body>
@@ -19,6 +142,8 @@
     </header>
 
     <main id="app">
+
+        <!-- ── Curadoria (unchanged) ── -->
         <section class="section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2 class="section-title" style="margin-bottom: 0;">✨ Sugestões de Hoje (Curadoria IA)</h2>
@@ -29,14 +154,214 @@
             <div id="curated-grid" class="product-grid" style="display: none;"></div>
         </section>
 
-        <section class="section" style="margin-top: 50px; opacity: 0.8;">
-            <h2 class="section-title">📦 Todos os Produtos (Recém Descobertos)</h2>
-            <div id="loader" class="loader">Carregando feed global...</div>
-            <div id="product-grid" class="product-grid" style="display: none;"></div>
+        <!-- ── Product Tabs ── -->
+        <section class="section tabs-section">
+            <h2 class="section-title">📦 Central de Produtos</h2>
+
+            <nav class="tabs-nav" role="tablist">
+                <button class="tab-btn active" role="tab" aria-selected="true" onclick="switchTab('queued')"
+                    id="tab-btn-queued">
+                    🚀 Na Fila <span class="tab-badge zero" id="badge-queued">…</span>
+                </button>
+                <button class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('ready')"
+                    id="tab-btn-ready">
+                    ✅ Prontos <span class="tab-badge zero" id="badge-ready">…</span>
+                </button>
+                <button class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('sent')" id="tab-btn-sent">
+                    📤 Enviados <span class="tab-badge zero" id="badge-sent">…</span>
+                </button>
+                <button class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('ignored')"
+                    id="tab-btn-ignored">
+                    🗑️ Lixeira <span class="tab-badge zero" id="badge-ignored">…</span>
+                </button>
+
+                <div class="search-container">
+                    <input type="text" id="search-input" placeholder="Pesquisar produto..."
+                        onkeyup="if(event.key==='Enter') performSearch()">
+                    <button class="search-btn" onclick="performSearch()">🔍</button>
+                </div>
+            </nav>
+
+            <!-- Search Results (Hidden by default) -->
+            <div class="tab-panel" id="panel-search">
+                <div class="tab-loader" id="loader-search">Buscando produtos...</div>
+                <div class="product-grid" id="grid-search" style="display:none;"></div>
+            </div>
+            </nav>
+
+            <!-- Na Fila -->
+            <div class="tab-panel active" id="panel-queued">
+                <div class="tab-loader" id="loader-queued">Carregando produtos na fila...</div>
+                <div class="product-grid" id="grid-queued" style="display:none;"></div>
+            </div>
+
+            <!-- Prontos -->
+            <div class="tab-panel" id="panel-ready">
+                <div class="tab-loader" id="loader-ready">Clique na aba para carregar.</div>
+                <div class="product-grid" id="grid-ready" style="display:none;"></div>
+            </div>
+
+            <!-- Enviados -->
+            <div class="tab-panel" id="panel-sent">
+                <div class="tab-loader" id="loader-sent">Clique na aba para carregar.</div>
+                <div class="product-grid" id="grid-sent" style="display:none;"></div>
+            </div>
+
+            <!-- Lixeira -->
+            <div class="tab-panel" id="panel-ignored">
+                <div class="tab-loader" id="loader-ignored">Clique na aba para carregar.</div>
+                <div class="product-grid" id="grid-ignored" style="display:none;"></div>
+            </div>
         </section>
     </main>
 
     <script>
+        // ── Tab config ──────────────────────────────────────────────
+        const TAB_CONFIG = {
+            queued: { endpoint: '/api/products/queued', canGenerate: true },
+            ready: { endpoint: '/api/products/ready', canGenerate: true },
+            sent: { endpoint: '/api/products/sent', canGenerate: false },
+            ignored: { endpoint: '/api/products/ignored', canGenerate: false },
+            search: { endpoint: null, canGenerate: true }
+        };
+        const loaded = {}; // tracks which tabs have already fetched
+
+        // ── Tab switching ────────────────────────────────────────────
+        function switchTab(tabId) {
+            // Update buttons (only if not search)
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                const isActive = btn.id === `tab-btn-${tabId}`;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-selected', isActive);
+            });
+            // Update panels
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+                panel.classList.toggle('active', panel.id === `panel-${tabId}`);
+            });
+            // Lazy-load if not yet fetched and has endpoint
+            if (TAB_CONFIG[tabId]?.endpoint && !loaded[tabId]) loadTab(tabId);
+        }
+
+        // ── Load tab data ────────────────────────────────────────────
+        async function loadTab(tabId) {
+            const { endpoint, canGenerate } = TAB_CONFIG[tabId];
+            const loader = document.getElementById(`loader-${tabId}`);
+            const grid = document.getElementById(`grid-${tabId}`);
+            const badge = document.getElementById(`badge-${tabId}`);
+
+            loader.textContent = 'Carregando...';
+            loader.style.display = 'block';
+            grid.style.display = 'none';
+
+            try {
+                const res = await fetch(endpoint);
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    const products = data.data || [];
+                    const count = products.length;
+
+                    // Update badge
+                    badge.textContent = count;
+                    badge.classList.toggle('zero', count === 0);
+
+                    renderTabGrid(products, grid, loader, canGenerate);
+                    loaded[tabId] = true;
+                } else {
+                    loader.textContent = 'Nenhum produto encontrado.';
+                }
+            } catch (err) {
+                loader.textContent = `Erro ao carregar: ${err.message}`;
+            }
+        }
+
+        // ── Render grid for a tab ────────────────────────────────────
+        function renderTabGrid(products, grid, loader, canGenerate) {
+            loader.style.display = 'none';
+            grid.style.display = 'grid';
+            grid.innerHTML = '';
+
+            if (products.length === 0) {
+                grid.innerHTML = "<p style='grid-column:1/-1;text-align:center;color:#888;'>Nenhum produto nesta categoria.</p>";
+                return;
+            }
+
+            const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+            products.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+
+                const currentPrice = fmt.format(p.price || 0);
+                const oldPrice = (p.price_before_discount > p.price)
+                    ? fmt.format(p.price_before_discount) : '';
+                const discount = p.discount_rate > 0
+                    ? `<div class="badge discount">-${Math.round(p.discount_rate)}%</div>` : '';
+                const affiliateBtn = (p.affiliate_url)
+                    ? `<a href="${p.affiliate_url}" target="_blank" class="btn btn-shopee" title="Ver original">🛒 Ver</a>`
+                    : '';
+                const generateBtn = canGenerate
+                    ? `<button class="btn btn-secondary-small" onclick="window.location.href='/review.html?id=${p.id}'">✨ Gerar Vídeo Li</button>`
+                    : '';
+
+                card.innerHTML = `
+                    <div class="card-image">
+                        <img src="${p.image_url || ''}" alt="Product image" loading="lazy"
+                             onerror="this.style.display='none'">
+                        ${discount}
+                        <div class="badge platform">${p.platform || ''}</div>
+                    </div>
+                    <div class="card-content">
+                        <h3 class="product-title" title="${p.name}">${p.name}</h3>
+                        <div class="price-container">
+                            <span class="old-price">${oldPrice}</span>
+                            <span class="current-price">${currentPrice}</span>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-top:15px;align-items:center;">
+                            ${generateBtn}
+                            ${affiliateBtn}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // ── Search Logic ─────────────────────────────────────────────
+        async function performSearch() {
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return;
+
+            // Activate search panel
+            switchTab('search');
+
+            const loader = document.getElementById('loader-search');
+            const grid = document.getElementById('grid-search');
+
+            loader.textContent = `Buscando por "${query}"...`;
+            loader.style.display = 'block';
+            grid.style.display = 'none';
+
+            try {
+                const res = await fetch(`/api/products/search?q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    renderTabGrid(data.data, grid, loader, true); // Search results allow generation
+                    // Deactivate all tab buttons visuals
+                    document.querySelectorAll('.tab-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                        btn.setAttribute('aria-selected', 'false');
+                    });
+                } else {
+                    loader.textContent = 'Erro ao realizar busca.';
+                }
+            } catch (err) {
+                loader.textContent = `Erro na busca: ${err.message}`;
+            }
+        }
+
+        // ── Curadoria (unchanged logic) ──────────────────────────────
         async function loadCurated(force = false) {
             const loader = document.getElementById('loader-curated');
             const grid = document.getElementById('curated-grid');
@@ -55,7 +380,7 @@
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                    renderGrid(data.data, 'curated-grid', 'loader-curated', true);
+                    renderCuratedGrid(data.data, 'curated-grid', 'loader-curated');
                     if (data.cached) {
                         loader.style.display = 'block';
                         loader.innerHTML = `📌 Exibindo resultados de <b>${new Date().toLocaleDateString()}</b>. Para atualizar, clique em Minerar.`;
@@ -74,39 +399,25 @@
             }
         }
 
-        async function loadAll() {
-            try {
-                const response = await fetch('/api/products?limit=40');
-                const data = await response.json();
-                if (data.status === 'success') {
-                    renderGrid(data.data, 'product-grid', 'loader', false);
-                }
-            } catch (err) {
-                document.getElementById('loader').innerText = "Erro ao carregar feed.";
-            }
-        }
-
-        function renderGrid(products, gridId, loaderId, isCurated) {
+        function renderCuratedGrid(products, gridId, loaderId) {
             const grid = document.getElementById(gridId);
             const loader = document.getElementById(loaderId);
-
             loader.style.display = 'none';
             grid.style.display = 'grid';
 
-            if (products.length === 0 && isCurated) {
-                grid.innerHTML = "<p style='grid-column: 1/-1; text-align: center; color: #888;'>Nenhuma oferta bateu o filtro de ouro hoje.</p>";
+            if (products.length === 0) {
+                grid.innerHTML = "<p style='grid-column:1/-1;text-align:center;color:#888;'>Nenhuma oferta bateu o filtro de ouro hoje.</p>";
                 return;
             }
 
+            const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
             products.forEach(p => {
                 const card = document.createElement('div');
-                card.className = 'product-card' + (isCurated ? ' curated-card' : '');
+                card.className = 'product-card curated-card';
 
-                const priceFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-                const currentPrice = priceFormatter.format(p.current_price || p.price);
+                const currentPrice = fmt.format(p.current_price || p.price);
                 const oldPrice = (p.original_price || p.price_before_discount) > (p.current_price || p.price)
-                    ? priceFormatter.format(p.original_price || p.price_before_discount) : '';
-
+                    ? fmt.format(p.original_price || p.price_before_discount) : '';
                 const tagClass = p.ai_status_tag === 'Oportunidade Única' ? 'tag-unique' : 'tag-verified';
                 const tagIcon = p.ai_status_tag === 'Oportunidade Única' ? '⭐' : '✅';
 
@@ -115,7 +426,7 @@
                         <img src="${p.image_url}" alt="Product image" loading="lazy">
                         ${(p.current_discount || p.discount_rate) > 0 ? `<div class="badge discount">-${p.current_discount || p.discount_rate}%</div>` : ''}
                         <div class="badge platform">${p.platform}</div>
-                        ${isCurated ? `<div class="ai-tag ${tagClass}">${tagIcon} ${p.ai_status_tag}</div>` : ''}
+                        <div class="ai-tag ${tagClass}">${tagIcon} ${p.ai_status_tag}</div>
                     </div>
                     <div class="card-content">
                         <h3 class="product-title" title="${p.name}">${p.name}</h3>
@@ -123,8 +434,8 @@
                             <span class="old-price">${oldPrice}</span>
                             <span class="current-price">${currentPrice}</span>
                         </div>
-                        ${isCurated && p.sales_count ? `<div class="sales-info">📈 +${p.sales_count} vendidos</div>` : ''}
-                        <div style="display: flex; gap: 8px; margin-top: 15px; align-items: center;">
+                        ${p.sales_count ? `<div class="sales-info">📈 +${p.sales_count} vendidos</div>` : ''}
+                        <div style="display:flex;gap:8px;margin-top:15px;align-items:center;">
                             <button class="btn btn-secondary-small" onclick="window.location.href='/review.html?id=${p.id}'">✨ Gerar Vídeo Li</button>
                             ${(p.shopee_url || p.affiliate_url) ? `<a href="${p.shopee_url || p.affiliate_url}" target="_blank" class="btn btn-shopee" title="Ver original">🛒 Ver</a>` : ''}
                         </div>
@@ -134,9 +445,10 @@
             });
         }
 
+        // ── Init ─────────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', () => {
             loadCurated();
-            loadAll();
+            loadTab('queued'); // default tab loads immediately
         });
     </script>
 </body>

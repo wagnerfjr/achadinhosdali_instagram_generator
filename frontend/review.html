@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revisão de Vídeo</title>
+    <link rel="stylesheet" href="/frontend/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        .choice-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            max-width: 800px;
+            margin: 4rem auto;
+        }
+
+        .format-card {
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            padding: 2.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .format-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-8px);
+            box-shadow: 0 12px 32px rgba(88, 166, 255, 0.15);
+        }
+
+        .format-card h2 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .format-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .format-card .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .instagram-btn {
+            background: linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+            color: #fff;
+            border: none;
+        }
+
+        .instagram-btn:hover:not(:disabled) {
+            opacity: 0.88;
+            transform: translateY(-1px);
+        }
+
+        /* ... existing badge styles ... */
+        #ig-status-badge {
+            display: none;
+            margin-top: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+
+        #ig-status-badge.posting {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        #ig-status-badge.success {
+            background: #d1e7dd;
+            color: #0a5c36;
+        }
+
+        #ig-status-badge.error {
+            background: #f8d7da;
+            color: #842029;
+        }
+
+        .progress-container {
+            margin-top: 2rem;
+            width: 100%;
+            background: #222;
+            border-radius: 10px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 10px;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+    </style>
+</head>
+
+<body class="review-page">
+    <header class="review-header">
+        <a href="/" class="btn btn-secondary back-btn">← Voltar</a>
+        <h1>Escolha o Formato do Vídeo</h1>
+    </header>
+
+    <main id="app" class="review-container">
+        <!-- SELECTION STATE -->
+        <div id="choice-state">
+            <div class="choice-container">
+                <div class="format-card" onclick="startGeneration('reels')">
+                    <div class="icon">🎬</div>
+                    <h2>Reels</h2>
+                    <p>Foco em viralidade no Feed. <br>Design limpo (sem intro), legendas dinâmicas e <b>cover
+                            automático</b>.</p>
+                </div>
+                <div class="format-card" onclick="startGeneration('stories')">
+                    <div class="icon">📖</div>
+                    <h2>Stories</h2>
+                    <p>Engajamento direto. <br>Sanduíche completo (Intro Li + Miolo com Preço + CTA direto).</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOADING STATE -->
+        <div id="loading-state" class="state-container" style="display: none;">
+            <div class="spinner"></div>
+            <h2 id="progress-status">Preparando Inteligência Artificial...</h2>
+            <div class="progress-container" id="progress-box" style="display: block;">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <p id="progress-detail">Isso pode levar de 30 a 60 segundos.</p>
+        </div>
+
+        <!-- CONTENT STATE -->
+        <div id="content-state" class="state-container" style="display: none;">
+            <div class="preview-layout">
+                <div class="video-preview">
+                    <div class="phone-frame">
+                        <video id="player" controls playsinline loop></video>
+                    </div>
+                </div>
+
+                <div class="text-preview">
+                    <h2>Legenda SEO Premium</h2>
+                    <textarea id="caption-box" rows="12"></textarea>
+
+                    <div class="action-buttons">
+                        <button id="btn-save" class="btn btn-primary btn-large" onclick="saveContent()">
+                            💾 Salvar e Finalizar
+                        </button>
+                        <button id="btn-instagram" class="btn instagram-btn btn-large" onclick="postToInstagram()"
+                            style="display:none;" disabled>
+                            📱 Publicar agora
+                        </button>
+                    </div>
+
+                    <div id="ig-status-badge"></div>
+                    <div id="status-message" class="status-message"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const productId = urlParams.get('id');
+        let currentFormat = ''; // 'reels' or 'stories'
+        let autoPostEnabled = false;
+
+        if (!productId) {
+            alert("Nenhum produto selecionado!");
+            window.location.href = "/";
+        }
+
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const cfg = await res.json();
+                autoPostEnabled = cfg.instagram_auto_post === true;
+            } catch (_) { autoPostEnabled = false; }
+        }
+
+        async function startGeneration(format) {
+            currentFormat = format;
+            document.getElementById('choice-state').style.display = 'none';
+            document.getElementById('loading-state').style.display = 'block';
+            document.querySelector('.review-header h1').innerText = `Gerando ${format.charAt(0).toUpperCase() + format.slice(1)}...`;
+
+            await loadConfig();
+            pollProgress();
+
+            try {
+                const endpoint = `/api/generate-${format}/${productId}`;
+                const res = await fetch(endpoint, { method: 'POST' });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    showContent(data);
+                } else {
+                    showError(data.detail || "Erro na geração do vídeo");
+                }
+            } catch (e) {
+                showError(e.message);
+            }
+        }
+
+        let progressTimer = null;
+        function pollProgress() {
+            if (progressTimer) clearTimeout(progressTimer);
+
+            async function check() {
+                // Stop polling if we are no longer in the loading state
+                const loadingBox = document.getElementById('loading-state');
+                if (!loadingBox || loadingBox.style.display !== 'block') {
+                    progressTimer = null;
+                    return;
+                }
+
+                try {
+                    const res = await fetch(`/api/progress/${productId}?t=${new Date().getTime()}`);
+                    const data = await res.json();
+
+                    if (data.percentage !== undefined) {
+                        document.getElementById('progress-bar').style.width = `${data.percentage}%`;
+                        document.getElementById('progress-status').innerText = data.message || 'Processando...';
+                    }
+
+                    // Stop if error or finished
+                    if (data.status === 'error' || (data.percentage && data.percentage >= 100)) {
+                        progressTimer = null;
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Polling error:", e);
+                }
+
+                progressTimer = setTimeout(check, 2000); // Polling every 2s to reduce log noise
+            }
+            check();
+        }
+
+        function showContent(data) {
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('content-state').style.display = 'block';
+            document.querySelector('.review-header h1').innerText = "Revisão Final";
+
+            const player = document.getElementById('player');
+            player.src = `${data.video_url}?t=${new Date().getTime()}`;
+            player.play();
+
+            document.getElementById('caption-box').value = data.caption || '';
+        }
+
+        function showError(msg) {
+            document.getElementById('loading-state').innerHTML =
+                `<h2 style="color:var(--danger)">Erro:</h2><p>${msg}</p><br><a href="javascript:location.reload()" class="btn btn-secondary">Tentar Novamente</a>`;
+        }
+
+        async function saveContent() {
+            const btn = document.getElementById('btn-save');
+            const caption = document.getElementById('caption-box').value;
+            btn.disabled = true;
+            btn.innerText = "Processando...";
+            document.getElementById('status-message').innerHTML = ""; // Clear previous
+
+            try {
+                const endpoint = `/api/approve-${currentFormat}/${productId}`;
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ caption })
+                });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    let statusHtml = `<span class="success">✅ Salvo com sucesso!</span>`;
+
+                    if (autoPostEnabled && data.instagram_status) {
+                        const igOk = data.instagram_status === 'Published';
+                        statusHtml += `<br><small>Instagram: ${igOk ? '📱 Publicado automaticamente!' : '❌ ' + data.instagram_status}</small>`;
+                    } else if (!autoPostEnabled) {
+                        showInstagramButton();
+                    }
+
+                    document.getElementById('status-message').innerHTML = statusHtml;
+                    btn.innerText = "💾 Salvo";
+                    // Don't re-enable if success, but allow retry if warning/manual
+                    if (!autoPostEnabled) btn.disabled = false;
+                } else {
+                    throw new Error(data.detail || "Erro desconhecido");
+                }
+            } catch (e) {
+                document.getElementById('status-message').innerHTML = `<span class="error">❌ Erro ao salvar: ${e.message}</span>`;
+                btn.disabled = false;
+                btn.innerText = "💾 Tentar Salvar Novamente";
+            }
+        }
+
+        function showInstagramButton() {
+            const igBtn = document.getElementById('btn-instagram');
+            igBtn.style.display = 'inline-flex';
+            igBtn.innerText = `📱 Publicar no ${currentFormat.charAt(0).toUpperCase() + currentFormat.slice(1)}`;
+            igBtn.disabled = false;
+        }
+
+        async function postToInstagram() {
+            const igBtn = document.getElementById('btn-instagram');
+            const badge = document.getElementById('ig-status-badge');
+            const caption = document.getElementById('caption-box').value;
+
+            igBtn.disabled = true;
+            igBtn.innerText = "Postando...";
+            badge.className = 'posting';
+            badge.style.display = 'block';
+            badge.innerText = `⏳ Enviando ${currentFormat} para o Instagram...`;
+
+            try {
+                const res = await fetch(`/api/instagram/post/${productId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ caption, format: currentFormat })
+                });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    badge.className = 'success';
+                    badge.innerText = `📱 Publicado com sucesso!`;
+                    igBtn.innerText = "✅ Publicado!";
+                } else { throw new Error(data.detail || "Falha na publicação"); }
+            } catch (e) {
+                badge.className = 'error';
+                badge.innerText = `❌ Falha: ${e.message}`;
+                igBtn.disabled = false;
+                igBtn.innerText = "📱 Tentar Postar Novamente";
+            }
+        }
+    </script>
+</body>
+
+</html>

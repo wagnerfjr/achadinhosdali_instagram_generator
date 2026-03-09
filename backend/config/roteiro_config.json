@@ -1,0 +1,91 @@
+{
+    "voice": {
+        "provider": "elevenlabs",
+        "model_id": "eleven_multilingual_v2",
+        "stability": 0.65,
+        "similarity_boost": 0.85,
+        "style": 0.0,
+        "use_speaker_boost": true
+    },
+    "text_processing": {
+        "currency": {
+            "omit_zero_cents": true,
+            "omit_word_cents": true,
+            "round_to_nearest_integer": true,
+            "psychological_rounding": true
+        },
+        "numbers": {
+            "format_large_numbers": "natural",
+            "abbreviate_thousands": true
+        },
+        "ratings": {
+            "mention_count": true,
+            "round_up": true
+        }
+    },
+    "script_style": {
+        "target_duration_seconds": 30,
+        "forbidden_words": [
+            "adquira",
+            "confira",
+            "aproveite",
+            "imperdível",
+            "compre",
+            "clique"
+        ],
+        "favorite_words": [
+            "gente",
+            "olha",
+            "tô",
+            "demais",
+            "perfeito",
+            "achadinho",
+            "obcecada",
+            "fala sério"
+        ],
+        "hook_styles": [
+            "choque_preco",
+            "pergunta_retorica",
+            "segredo",
+            "urgencia_emocional"
+        ],
+        "cta_style": "duplo_engajamento"
+    },
+    "visuals": {
+        "legend_position": "center-bottom",
+        "legend_color_active": "#FFE600",
+        "font_size": 70
+    },
+    "assets": {
+        "intros": [
+            {
+                "file": "Oi_Gente_Bem_vindo_de_volta.mp4",
+                "phrase": "oi gente bem vindo de volta ao achadinhos da li"
+            },
+            {
+                "file": "Olha_o_que_eu_encontrei_hoje.mp4",
+                "phrase": "oi pessoal eu sou a li do achadinhos da li olha o que eu encontrei hoje"
+            },
+            {
+                "file": "Simplesmente_Perfeito_Olha_Isso.mp4",
+                "phrase": "simplesmente perfeito olha isso que eu acabei de encontrar"
+            }
+        ],
+        "outros": [
+            {
+                "file": "Comenta_eu_quero.mp4",
+                "phrase": "comenta eu quero que eu te mando o link agora mesmo"
+            }
+        ],
+        "cta_reels": [
+            {
+                "file": "Criação_de_Vídeo_CTA_Instagram.mp4"
+            }
+        ],
+        "cta_stories": [
+            {
+                "file": "Comenta_eu_quero.mp4"
+            }
+        ]
+    }
+}

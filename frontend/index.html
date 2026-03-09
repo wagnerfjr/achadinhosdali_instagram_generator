@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Achadinhos da Li - Premium</title>
+    <link rel="stylesheet" href="/frontend/style.css?v=1.1">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <h1>🔥 Achadinhos da Li - Premium</h1>
+        <p>Produtos selecionados pela IA com os melhores descontos da semana</p>
+    </header>
+
+    <main id="app">
+        <section class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 class="section-title" style="margin-bottom: 0;">✨ Sugestões de Hoje (Curadoria IA)</h2>
+                <button id="btn-curate" class="btn btn-primary-small" onclick="loadCurated(true)">💎 Minerar Ofertas de
+                    Hoje</button>
+            </div>
+            <div id="loader-curated" class="loader">Carregando última curadoria...</div>
+            <div id="curated-grid" class="product-grid" style="display: none;"></div>
+        </section>
+
+        <section class="section" style="margin-top: 50px; opacity: 0.8;">
+            <h2 class="section-title">📦 Todos os Produtos (Recém Descobertos)</h2>
+            <div id="loader" class="loader">Carregando feed global...</div>
+            <div id="product-grid" class="product-grid" style="display: none;"></div>
+        </section>
+    </main>
+
+    <script>
+        async function loadCurated(force = false) {
+            const loader = document.getElementById('loader-curated');
+            const grid = document.getElementById('curated-grid');
+            const btn = document.getElementById('btn-curate');
+
+            try {
+                if (force) {
+                    btn.disabled = true;
+                    btn.innerText = "⏳ Minerando...";
+                    loader.style.display = 'block';
+                    loader.innerText = "Realizando varredura profunda na Shopee... (Isso pode levar 1-2 min)";
+                    grid.style.display = 'none';
+                }
+
+                const response = await fetch(`/api/curated-products${force ? '?force=true' : ''}`);
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    renderGrid(data.data, 'curated-grid', 'loader-curated', true);
+                    if (data.cached) {
+                        loader.style.display = 'block';
+                        loader.innerHTML = `📌 Exibindo resultados de <b>${new Date().toLocaleDateString()}</b>. Para atualizar, clique em Minerar.`;
+                        loader.className = 'cache-info';
+                    }
+                } else {
+                    loader.innerText = "Sem ofertas premium no momento.";
+                }
+            } catch (err) {
+                loader.innerText = "Erro ao buscar curadoria.";
+            } finally {
+                if (force) {
+                    btn.disabled = false;
+                    btn.innerText = "💎 Minerar Ofertas de Hoje";
+                }
+            }
+        }
+
+        async function loadAll() {
+            try {
+                const response = await fetch('/api/products?limit=40');
+                const data = await response.json();
+                if (data.status === 'success') {
+                    renderGrid(data.data, 'product-grid', 'loader', false);
+                }
+            } catch (err) {
+                document.getElementById('loader').innerText = "Erro ao carregar feed.";
+            }
+        }
+
+        function renderGrid(products, gridId, loaderId, isCurated) {
+            const grid = document.getElementById(gridId);
+            const loader = document.getElementById(loaderId);
+
+            loader.style.display = 'none';
+            grid.style.display = 'grid';
+
+            if (products.length === 0 && isCurated) {
+                grid.innerHTML = "<p style='grid-column: 1/-1; text-align: center; color: #888;'>Nenhuma oferta bateu o filtro de ouro hoje.</p>";
+                return;
+            }
+
+            products.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'product-card' + (isCurated ? ' curated-card' : '');
+
+                const priceFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+                const currentPrice = priceFormatter.format(p.current_price || p.price);
+                const oldPrice = (p.original_price || p.price_before_discount) > (p.current_price || p.price)
+                    ? priceFormatter.format(p.original_price || p.price_before_discount) : '';
+
+                const tagClass = p.ai_status_tag === 'Oportunidade Única' ? 'tag-unique' : 'tag-verified';
+                const tagIcon = p.ai_status_tag === 'Oportunidade Única' ? '⭐' : '✅';
+
+                card.innerHTML = `
+                    <div class="card-image">
+                        <img src="${p.image_url}" alt="Product image" loading="lazy">
+                        ${(p.current_discount || p.discount_rate) > 0 ? `<div class="badge discount">-${p.current_discount || p.discount_rate}%</div>` : ''}
+                        <div class="badge platform">${p.platform}</div>
+                        ${isCurated ? `<div class="ai-tag ${tagClass}">${tagIcon} ${p.ai_status_tag}</div>` : ''}
+                    </div>
+                    <div class="card-content">
+                        <h3 class="product-title" title="${p.name}">${p.name}</h3>
+                        <div class="price-container">
+                            <span class="old-price">${oldPrice}</span>
+                            <span class="current-price">${currentPrice}</span>
+                        </div>
+                        ${isCurated && p.sales_count ? `<div class="sales-info">📈 +${p.sales_count} vendidos</div>` : ''}
+                        <div style="display: flex; gap: 8px; margin-top: 15px; align-items: center;">
+                            <button class="btn btn-secondary-small" onclick="window.location.href='/review.html?id=${p.id}'">✨ Gerar Vídeo Li</button>
+                            ${(p.shopee_url || p.affiliate_url) ? `<a href="${p.shopee_url || p.affiliate_url}" target="_blank" class="btn btn-shopee" title="Ver original">🛒 Ver</a>` : ''}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCurated();
+            loadAll();
+        });
+    </script>
+</body>
+
+</html>

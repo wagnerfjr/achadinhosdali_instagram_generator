@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+build/
+dist/
+*.egg-info/
+
+# Environment and Secrets
+.env
+token.json
+client_secret.json
+
+# Logs
+*.log
+diag.log
+
+# Temporary / Output
+temp/
+output/
+test_media_ali/
+*.mp4
+*.jpeg
+*.png
+*.mov
+fluxo_N8N_Content_Factory.json
+assets/intros/*.pdf
+!assets/
+!voz_li.mp4
+
+# IDE
+.vscode/
+.idea/
+.agent/
+.gemini/
